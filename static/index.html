@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>客户画像生成系统</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .conf-high   { @apply bg-emerald-100 text-emerald-800 border border-emerald-300; }
+    .conf-medium { @apply bg-amber-100 text-amber-800 border border-amber-300; }
+    .conf-low    { @apply bg-red-100 text-red-800 border border-red-300; }
+    .fade-in { animation: fadeIn .4s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .spinner { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800">
+
+  <!-- 顶栏 -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center gap-3">
+    <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold">C</div>
+    <div>
+      <h1 class="font-semibold text-slate-900 leading-tight">客户画像生成系统</h1>
+      <p class="text-xs text-slate-400">多维调研 · 智能分析 · 接待准备</p>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
+
+    <!-- 左栏：输入表单 -->
+    <aside class="lg:w-80 shrink-0">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sticky top-6">
+        <h2 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+          <span class="w-5 h-5 rounded bg-blue-50 text-blue-600 flex items-center justify-center text-xs">✦</span>
+          来访信息录入
+        </h2>
+
+        <form id="form" class="space-y-4">
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">单位名称 <span class="text-red-400">*</span></label>
+            <input id="org_name" type="text" placeholder="如：国家电网有限公司" required
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-50" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">所属行业 <span class="text-red-400">*</span></label>
+            <input id="industry" type="text" placeholder="如：电力能源" required
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-50" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">主宾姓名 <span class="text-red-400">*</span></label>
+            <input id="guest_name" type="text" placeholder="如：张伟" required
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-50" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">参观需求 <span class="text-red-400">*</span></label>
+            <textarea id="visit_needs" rows="3" placeholder="如：考察数字化转型和智慧园区建设方案" required
+              class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-50 resize-none"></textarea>
+          </div>
+
+          <button type="submit" id="submit-btn"
+            class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg py-2.5 transition-colors flex items-center justify-center gap-2">
+            <span id="btn-text">开始调研生成画像</span>
+          </button>
+        </form>
+
+        <!-- 调研进度 -->
+        <div id="progress" class="hidden mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+          <div class="flex items-center gap-2 mb-2">
+            <div class="spinner w-4 h-4 rounded-full border-2 border-blue-200 shrink-0"></div>
+            <span class="text-xs font-medium text-blue-700">调研进行中...</span>
+            <span class="ml-auto text-xs text-blue-400"><span id="timer">0</span> 秒</span>
+          </div>
+          <p class="text-xs text-blue-400 mb-2">互联网多维搜索 + AI分析，通常需要 30-60 秒</p>
+          <!-- 实时日志控制台 -->
+          <div id="log-console" class="bg-slate-900 rounded-lg p-2 max-h-44 overflow-y-auto font-mono text-xs leading-5 space-y-0.5"></div>
+        </div>
+
+        <!-- 错误提示 -->
+        <div id="error-box" class="hidden mt-4 p-3 rounded-lg border text-xs"></div>
+      </div>
+    </aside>
+
+    <!-- 右栏：结果展示 -->
+    <main class="flex-1 min-w-0">
+
+      <!-- 空态引导 -->
+      <div id="empty-state" class="flex flex-col items-center justify-center py-24 text-slate-400">
+        <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-3xl mb-4">🔍</div>
+        <p class="text-sm font-medium">填写左侧来访信息，生成客户画像</p>
+        <p class="text-xs mt-1">系统将自动调研并生成多维分析报告</p>
+      </div>
+
+      <!-- 结果区域 -->
+      <div id="results" class="hidden space-y-4 fade-in">
+
+        <!-- 顶部：置信度 + 搜索统计 -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div class="flex flex-wrap items-center gap-4">
+            <div>
+              <p class="text-xs text-slate-400 mb-1">综合置信度</p>
+              <span id="conf-overall" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="h-8 w-px bg-slate-100"></div>
+            <div>
+              <p class="text-xs text-slate-400 mb-1">单位画像置信度</p>
+              <span id="conf-org" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="h-8 w-px bg-slate-100"></div>
+            <div>
+              <p class="text-xs text-slate-400 mb-1">主宾画像置信度</p>
+              <span id="conf-guest" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="ml-auto text-right">
+              <p class="text-xs text-slate-400">共执行搜索</p>
+              <p class="text-lg font-bold text-blue-600" id="query-count">—</p>
+            </div>
+          </div>
+          <p id="conf-notes" class="mt-3 text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5 leading-relaxed"></p>
+        </div>
+
+        <!-- 风险提示（优先展示） -->
+        <div id="risk-card" class="bg-orange-50 rounded-xl border border-orange-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-orange-800 mb-3 flex items-center gap-2">
+            <span>⚠️</span> 风险提示 &amp; 注意事项
+          </h3>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs font-medium text-orange-700 mb-1.5">敏感话题</p>
+              <ul id="sensitive-topics" class="space-y-1"></ul>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-orange-700 mb-1.5">信息缺口 / 待核实</p>
+              <ul id="info-gaps" class="space-y-1"></ul>
+            </div>
+            <div class="sm:col-span-2">
+              <p class="text-xs font-medium text-orange-700 mb-1">竞品敏感</p>
+              <p id="competitive" class="text-xs text-orange-800 bg-orange-100 rounded px-2 py-1.5"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 两栏画像 -->
+        <div class="grid md:grid-cols-2 gap-4">
+
+          <!-- 单位画像 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">🏢</span> 单位画像
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">规模与性质</dt><dd id="org-scale" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">核心业务</dt><dd id="org-business" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">近期动态</dt><dd id="org-dynamics" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 行业地位 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">📊</span> 行业地位
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">市场排名</dt><dd id="ind-rank" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">竞争格局</dt><dd id="ind-landscape" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">行业趋势</dt><dd id="ind-trends" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 主宾画像 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">👤</span> 主宾画像
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">身份与职务</dt><dd id="guest-identity" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">决策权限</dt><dd id="guest-authority" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">公开立场</dt><dd id="guest-stance" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 来访动机 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">🎯</span> 来访动机
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">明面需求</dt><dd id="mot-stated" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">潜在动机</dt><dd id="mot-latent" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">决策阶段</dt><dd id="mot-stage" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- 接待建议 -->
+        <div class="bg-blue-50 rounded-xl border border-blue-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-blue-800 mb-4 flex items-center gap-2">
+            <span class="text-base">💡</span> 接待重点建议
+          </h3>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">话题切入点</p>
+              <ul id="entry-points" class="space-y-1.5"></ul>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">展厅重点展示</p>
+              <p id="showcase" class="text-xs text-blue-800 leading-relaxed"></p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">互动建议</p>
+              <p id="interaction" class="text-xs text-blue-800 leading-relaxed"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 信息来源 + 搜索词（可折叠） -->
+        <details class="bg-white rounded-xl border border-slate-200 shadow-sm">
+          <summary class="px-5 py-3.5 text-sm font-medium text-slate-600 cursor-pointer hover:text-slate-900 select-none">
+            📎 信息来源 &amp; 搜索词详情
+          </summary>
+          <div class="px-5 pb-5 pt-2 space-y-4">
+            <div>
+              <p class="text-xs font-medium text-slate-500 mb-2">参考来源</p>
+              <ul id="sources-list" class="space-y-2"></ul>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-slate-500 mb-2">执行的搜索词</p>
+              <div id="queries-list" class="flex flex-wrap gap-1.5"></div>
+            </div>
+          </div>
+        </details>
+
+      </div><!-- /results -->
+    </main>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const confClass = v => ({ high: 'conf-high', medium: 'conf-medium', low: 'conf-low' })[v] || 'bg-slate-100 text-slate-600';
+const confLabel = v => ({ high: '高 High', medium: '中 Medium', low: '低 Low' })[v] || v || '—';
+
+function setConf(el, value) {
+  el.textContent = confLabel(value);
+  el.className = `px-2.5 py-1 rounded-full text-xs font-semibold ${confClass(value)}`;
+}
+
+function txt(id, val) {
+  $(id).textContent = val || '—';
+}
+
+function renderList(id, items, cls = 'text-slate-600') {
+  const ul = $(id);
+  ul.innerHTML = '';
+  (items || []).forEach(item => {
+    const li = document.createElement('li');
+    li.className = `text-xs ${cls} flex gap-1.5 items-start`;
+    li.innerHTML = `<span class="mt-0.5 shrink-0">•</span><span>${item}</span>`;
+    ul.appendChild(li);
+  });
+  if (!items || items.length === 0) {
+    ul.innerHTML = '<li class="text-xs text-slate-400">无</li>';
+  }
+}
+
+function renderPortrait(data) {
+  const p = data.portrait || {};
+  const ca = data.confidence_assessment || {};
+
+  // 置信度
+  setConf($('conf-overall'), ca.overall);
+  setConf($('conf-org'),     ca.org_profile);
+  setConf($('conf-guest'),   ca.guest_profile);
+  txt('conf-notes', ca.notes);
+  $('query-count').textContent = (data.queries_executed || []).length;
+
+  // 单位画像
+  const org = p.org_profile || {};
+  txt('org-scale',    org.scale_and_nature);
+  txt('org-business', org.core_business);
+  txt('org-dynamics', org.recent_dynamics);
+
+  // 行业地位
+  const ind = p.industry_position || {};
+  txt('ind-rank',      ind.market_rank);
+  txt('ind-landscape', ind.competitive_landscape);
+  txt('ind-trends',    ind.industry_trends);
+
+  // 主宾画像
+  const g = p.guest_profile || {};
+  txt('guest-identity',  g.identity);
+  txt('guest-authority', g.decision_authority);
+  txt('guest-stance',    g.public_stance);
+
+  // 来访动机
+  const m = p.visit_motivation || {};
+  txt('mot-stated',  m.stated_needs);
+  txt('mot-latent',  m.latent_needs);
+  txt('mot-stage',   m.decision_stage);
+
+  // 接待建议
+  const r = p.reception_focus || {};
+  renderList('entry-points', r.entry_points, 'text-blue-800');
+  txt('showcase',    r.showcase_priorities);
+  txt('interaction', r.interaction_suggestions);
+
+  // 风险提示
+  const risk = p.risk_alerts || {};
+  renderList('sensitive-topics', risk.sensitive_topics, 'text-orange-700');
+  renderList('info-gaps', risk.information_gaps, 'text-orange-700');
+  txt('competitive', risk.competitive_sensitivities);
+
+  // 来源
+  const srcList = $('sources-list');
+  srcList.innerHTML = '';
+  (data.sources || []).forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'text-xs flex gap-2 items-start';
+    li.innerHTML = `
+      <span class="shrink-0 w-5 h-5 rounded bg-slate-100 text-slate-500 flex items-center justify-center font-mono">${i+1}</span>
+      <div>
+        <a href="${s.url}" target="_blank" class="text-blue-600 hover:underline font-medium">${s.title || s.url}</a>
+        ${s.relevance ? `<p class="text-slate-400 mt-0.5">${s.relevance}</p>` : ''}
+      </div>`;
+    srcList.appendChild(li);
+  });
+
+  // 搜索词
+  const qList = $('queries-list');
+  qList.innerHTML = '';
+  (data.queries_executed || []).forEach(q => {
+    const tag = document.createElement('span');
+    tag.className = 'px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs';
+    tag.textContent = q;
+    qList.appendChild(tag);
+  });
+}
+
+// 计时器
+let timerInterval = null;
+function startTimer() {
+  let s = 0;
+  $('timer').textContent = '0';
+  timerInterval = setInterval(() => { $('timer').textContent = ++s; }, 1000);
+}
+function stopTimer() { clearInterval(timerInterval); timerInterval = null; }
+
+// 实时日志
+function appendLog(msg) {
+  const c = $('log-console');
+  const line = document.createElement('div');
+  const isStage = msg.startsWith('[阶段');
+  line.className = isStage ? 'text-cyan-300 font-semibold' : 'text-green-400';
+  line.textContent = msg;
+  c.appendChild(line);
+  c.scrollTop = c.scrollHeight;
+}
+
+function showError(msg, is422 = false) {
+  const errBox = $('error-box');
+  if (is422) {
+    errBox.className = 'mt-4 p-3 rounded-lg border text-xs bg-amber-50 border-amber-300 text-amber-800';
+    errBox.innerHTML = `<span class="font-semibold">⚠️ 输入有误</span>：${msg}`;
+  } else {
+    errBox.className = 'mt-4 p-3 rounded-lg border text-xs bg-red-50 border-red-200 text-red-700';
+    errBox.innerHTML = `<span class="font-semibold">系统错误</span>：${msg}`;
+  }
+  errBox.classList.remove('hidden');
+}
+
+// 表单提交
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+
+  const payload = {
+    org_name:    $('org_name').value.trim(),
+    industry:    $('industry').value.trim(),
+    guest_name:  $('guest_name').value.trim(),
+    visit_needs: $('visit_needs').value.trim(),
+  };
+
+  // UI 状态：loading
+  $('submit-btn').disabled = true;
+  $('btn-text').textContent = '调研中...';
+  $('progress').classList.remove('hidden');
+  $('log-console').innerHTML = '';
+  $('error-box').classList.add('hidden');
+  $('results').classList.add('hidden');
+  $('empty-state').classList.add('hidden');
+  startTimer();
+
+  try {
+    const resp = await fetch('/portrait/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let gotResult = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop();   // 保留不完整的行
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+        let evt;
+        try { evt = JSON.parse(raw); } catch { continue; }
+
+        if (evt.type === 'log') {
+          appendLog(evt.msg);
+        } else if (evt.type === 'heartbeat') {
+          // keep-alive，忽略
+        } else if (evt.type === 'result') {
+          gotResult = true;
+          renderPortrait(evt.data);
+          $('results').classList.remove('hidden');
+          $('results').classList.add('fade-in');
+        } else if (evt.type === 'validation_error') {
+          showError(evt.msg, true);
+        } else if (evt.type === 'error') {
+          showError(evt.msg, false);
+        }
+      }
+    }
+
+    if (!gotResult && $('error-box').classList.contains('hidden')) {
+      showError('未收到有效响应，请重试');
+    }
+  } catch (err) {
+    if ($('error-box').classList.contains('hidden')) {
+      showError(err.message || '网络错误，服务不可达');
+    }
+    $('empty-state').classList.remove('hidden');
+  } finally {
+    stopTimer();
+    $('progress').classList.add('hidden');
+    $('submit-btn').disabled = false;
+    $('btn-text').textContent = '重新生成';
+  }
+});
+</script>
+</body>
+</html>

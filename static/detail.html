@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>客户画像详情</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .conf-high   { @apply bg-emerald-100 text-emerald-800 border border-emerald-300; }
+    .conf-medium { @apply bg-amber-100 text-amber-800 border border-amber-300; }
+    .conf-low    { @apply bg-red-100 text-red-800 border border-red-300; }
+    .fade-in { animation: fadeIn .4s ease; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .spinner { border-top-color: #3b82f6; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .edit-mode textarea, .edit-mode input { background: #fffbeb; border-color: #f59e0b; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-800">
+
+  <!-- 顶栏 -->
+  <header class="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white text-sm font-bold">C</div>
+      <div>
+        <h1 class="font-semibold text-slate-900 leading-tight">客户画像详情</h1>
+        <p class="text-xs text-slate-400">查看并补充画像信息</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <span id="save-status" class="text-xs text-slate-400"></span>
+      <button id="edit-btn"
+        class="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-300 hover:bg-slate-50 transition-colors">
+        编辑补充
+      </button>
+      <button id="save-btn"
+        class="hidden px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+        保存
+      </button>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
+
+    <!-- 左栏：客户基础信息 -->
+    <aside class="lg:w-80 shrink-0">
+      <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sticky top-6">
+        <h2 class="text-sm font-semibold text-slate-700 mb-4 flex items-center gap-2">
+          <span class="w-5 h-5 rounded bg-blue-50 text-blue-600 flex items-center justify-center text-xs">✦</span>
+          来访信息
+        </h2>
+        <dl class="space-y-4 text-xs">
+          <div>
+            <dt class="text-slate-400 mb-0.5">单位名称</dt>
+            <dd id="info-org" class="text-slate-700 font-medium">—</dd>
+          </div>
+          <div>
+            <dt class="text-slate-400 mb-0.5">所属行业</dt>
+            <dd id="info-industry" class="text-slate-700">—</dd>
+          </div>
+          <div>
+            <dt class="text-slate-400 mb-0.5">主宾姓名</dt>
+            <dd id="info-guest" class="text-slate-700">—</dd>
+          </div>
+          <div>
+            <dt class="text-slate-400 mb-0.5">参观需求</dt>
+            <dd id="info-needs" class="text-slate-700 leading-relaxed">—</dd>
+          </div>
+          <div>
+            <dt class="text-slate-400 mb-0.5">画像 ID</dt>
+            <dd id="info-id" class="text-slate-400 font-mono break-all">—</dd>
+          </div>
+          <div>
+            <dt class="text-slate-400 mb-0.5">更新时间</dt>
+            <dd id="info-updated" class="text-slate-500">—</dd>
+          </div>
+        </dl>
+      </div>
+    </aside>
+
+    <!-- 右栏：结果展示 + 编辑 -->
+    <main class="flex-1 min-w-0">
+
+      <!-- 加载中 -->
+      <div id="loading-state" class="flex flex-col items-center justify-center py-24 text-slate-400">
+        <div class="spinner w-8 h-8 rounded-full border-2 border-slate-200 mb-3"></div>
+        <p class="text-sm">加载画像中...</p>
+      </div>
+
+      <!-- 错误提示 -->
+      <div id="error-box" class="hidden rounded-lg border p-4 text-sm"></div>
+
+      <!-- 结果区域 -->
+      <div id="results" class="hidden space-y-4 fade-in">
+
+        <!-- 顶部：置信度 + 搜索统计 -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <div class="flex flex-wrap items-center gap-4">
+            <div>
+              <p class="text-xs text-slate-400 mb-1">综合置信度</p>
+              <span id="conf-overall" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="h-8 w-px bg-slate-100"></div>
+            <div>
+              <p class="text-xs text-slate-400 mb-1">单位画像置信度</p>
+              <span id="conf-org" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="h-8 w-px bg-slate-100"></div>
+            <div>
+              <p class="text-xs text-slate-400 mb-1">主宾画像置信度</p>
+              <span id="conf-guest" class="px-2.5 py-1 rounded-full text-xs font-semibold">—</span>
+            </div>
+            <div class="ml-auto text-right">
+              <p class="text-xs text-slate-400">共执行搜索</p>
+              <p class="text-lg font-bold text-blue-600" id="query-count">—</p>
+            </div>
+          </div>
+          <p id="conf-notes" class="mt-3 text-xs text-slate-500 bg-slate-50 rounded-lg p-2.5 leading-relaxed"></p>
+        </div>
+
+        <!-- 风险提示（优先展示） -->
+        <div id="risk-card" class="bg-orange-50 rounded-xl border border-orange-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-orange-800 mb-3 flex items-center gap-2">
+            <span>⚠️</span> 风险提示 &amp; 注意事项
+          </h3>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div>
+              <p class="text-xs font-medium text-orange-700 mb-1.5">敏感话题</p>
+              <ul id="sensitive-topics" class="space-y-1"></ul>
+              <textarea id="edit-sensitive-topics" rows="3" class="hidden w-full mt-1 rounded border border-orange-200 px-2 py-1 text-xs"></textarea>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-orange-700 mb-1.5">信息缺口 / 待核实</p>
+              <ul id="info-gaps" class="space-y-1"></ul>
+              <textarea id="edit-info-gaps" rows="3" class="hidden w-full mt-1 rounded border border-orange-200 px-2 py-1 text-xs"></textarea>
+            </div>
+            <div class="sm:col-span-2">
+              <p class="text-xs font-medium text-orange-700 mb-1">竞品敏感</p>
+              <p id="competitive" class="text-xs text-orange-800 bg-orange-100 rounded px-2 py-1.5"></p>
+              <textarea id="edit-competitive" rows="2" class="hidden w-full mt-1 rounded border border-orange-200 px-2 py-1 text-xs"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 两栏画像 -->
+        <div class="grid md:grid-cols-2 gap-4">
+
+          <!-- 单位画像 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">🏢</span> 单位画像
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">规模与性质</dt><dd id="org-scale" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">核心业务</dt><dd id="org-business" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">近期动态</dt><dd id="org-dynamics" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 行业地位 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">📊</span> 行业地位
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">市场排名</dt><dd id="ind-rank" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">竞争格局</dt><dd id="ind-landscape" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">行业趋势</dt><dd id="ind-trends" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 主宾画像 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">👤</span> 主宾画像
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">身份与职务</dt><dd id="guest-identity" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">决策权限</dt><dd id="guest-authority" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">公开立场</dt><dd id="guest-stance" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+
+          <!-- 来访动机 -->
+          <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+            <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <span class="text-base">🎯</span> 来访动机
+            </h3>
+            <dl class="space-y-3 text-xs">
+              <div><dt class="text-slate-400 mb-0.5">明面需求</dt><dd id="mot-stated" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">潜在动机</dt><dd id="mot-latent" class="text-slate-700 leading-relaxed"></dd></div>
+              <div><dt class="text-slate-400 mb-0.5">决策阶段</dt><dd id="mot-stage" class="text-slate-700 leading-relaxed"></dd></div>
+            </dl>
+          </div>
+        </div>
+
+        <!-- 接待建议 -->
+        <div class="bg-blue-50 rounded-xl border border-blue-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-blue-800 mb-4 flex items-center gap-2">
+            <span class="text-base">💡</span> 接待重点建议
+          </h3>
+          <div class="grid md:grid-cols-3 gap-4">
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">话题切入点</p>
+              <ul id="entry-points" class="space-y-1.5"></ul>
+              <textarea id="edit-entry-points" rows="3" class="hidden w-full mt-1 rounded border border-blue-200 px-2 py-1 text-xs"></textarea>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">展厅重点展示</p>
+              <p id="showcase" class="text-xs text-blue-800 leading-relaxed"></p>
+              <textarea id="edit-showcase" rows="3" class="hidden w-full mt-1 rounded border border-blue-200 px-2 py-1 text-xs"></textarea>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-blue-700 mb-2">互动建议</p>
+              <p id="interaction" class="text-xs text-blue-800 leading-relaxed"></p>
+              <textarea id="edit-interaction" rows="3" class="hidden w-full mt-1 rounded border border-blue-200 px-2 py-1 text-xs"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 补充说明 -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+          <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <span class="text-base">📝</span> 补充说明
+          </h3>
+          <p id="supplement-display" class="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">—</p>
+          <textarea id="edit-supplement" rows="4" class="hidden w-full rounded border border-slate-200 px-3 py-2 text-xs"></textarea>
+        </div>
+
+        <!-- 信息来源 + 搜索词（可折叠） -->
+        <details class="bg-white rounded-xl border border-slate-200 shadow-sm">
+          <summary class="px-5 py-3.5 text-sm font-medium text-slate-600 cursor-pointer hover:text-slate-900 select-none">
+            📎 信息来源 &amp; 搜索词详情
+          </summary>
+          <div class="px-5 pb-5 pt-2 space-y-4">
+            <div>
+              <p class="text-xs font-medium text-slate-500 mb-2">参考来源</p>
+              <ul id="sources-list" class="space-y-2"></ul>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-slate-500 mb-2">执行的搜索词</p>
+              <div id="queries-list" class="flex flex-wrap gap-1.5"></div>
+            </div>
+          </div>
+        </details>
+
+      </div><!-- /results -->
+    </main>
+  </div>
+
+<script>
+const $ = id => document.getElementById(id);
+const confClass = v => ({ high: 'conf-high', medium: 'conf-medium', low: 'conf-low' })[v] || 'bg-slate-100 text-slate-600';
+const confLabel = v => ({ high: '高 High', medium: '中 Medium', low: '低 Low' })[v] || v || '—';
+
+let currentData = null;
+let isEditMode = false;
+
+function setConf(el, value) {
+  el.textContent = confLabel(value);
+  el.className = `px-2.5 py-1 rounded-full text-xs font-semibold ${confClass(value)}`;
+}
+
+function txt(id, val) {
+  $(id).textContent = val || '—';
+}
+
+function renderList(id, items, cls = 'text-slate-600') {
+  const ul = $(id);
+  ul.innerHTML = '';
+  (items || []).forEach(item => {
+    const li = document.createElement('li');
+    li.className = `text-xs ${cls} flex gap-1.5 items-start`;
+    li.innerHTML = `<span class="mt-0.5 shrink-0">•</span><span>${item}</span>`;
+    ul.appendChild(li);
+  });
+  if (!items || items.length === 0) {
+    ul.innerHTML = '<li class="text-xs text-slate-400">无</li>';
+  }
+}
+
+function listToText(items) {
+  return (items || []).join('\n');
+}
+
+function textToList(text) {
+  return text.split('\n').map(s => s.trim()).filter(Boolean);
+}
+
+function showError(msg) {
+  const errBox = $('error-box');
+  errBox.className = 'rounded-lg border p-4 text-sm bg-red-50 border-red-200 text-red-700';
+  errBox.innerHTML = `<span class="font-semibold">加载失败</span>：${msg}`;
+  errBox.classList.remove('hidden');
+  $('loading-state').classList.add('hidden');
+}
+
+function renderPortrait(data) {
+  currentData = data;
+  const p = data.portrait || {};
+  const ca = data.confidence_assessment || {};
+  const ci = data.customer_input || {};
+
+  // 左侧信息
+  txt('info-org', ci.org_name);
+  txt('info-industry', ci.industry);
+  txt('info-guest', ci.guest_name);
+  txt('info-needs', ci.visit_needs);
+  txt('info-id', data.portrait_id || '');
+  txt('info-updated', data.updated_at ? new Date(data.updated_at).toLocaleString('zh-CN') : '—');
+
+  // 置信度
+  setConf($('conf-overall'), ca.overall);
+  setConf($('conf-org'),     ca.org_profile);
+  setConf($('conf-guest'),   ca.guest_profile);
+  txt('conf-notes', ca.notes);
+  $('query-count').textContent = (data.queries_executed || []).length;
+
+  // 单位画像
+  const org = p.org_profile || {};
+  txt('org-scale',    org.scale_and_nature);
+  txt('org-business', org.core_business);
+  txt('org-dynamics', org.recent_dynamics);
+
+  // 行业地位
+  const ind = p.industry_position || {};
+  txt('ind-rank',      ind.market_rank);
+  txt('ind-landscape', ind.competitive_landscape);
+  txt('ind-trends',    ind.industry_trends);
+
+  // 主宾画像
+  const g = p.guest_profile || {};
+  txt('guest-identity',  g.identity);
+  txt('guest-authority', g.decision_authority);
+  txt('guest-stance',    g.public_stance);
+
+  // 来访动机
+  const m = p.visit_motivation || {};
+  txt('mot-stated',  m.stated_needs);
+  txt('mot-latent',  m.latent_needs);
+  txt('mot-stage',   m.decision_stage);
+
+  // 接待建议
+  const r = p.reception_focus || {};
+  renderList('entry-points', r.entry_points, 'text-blue-800');
+  txt('showcase',    r.showcase_priorities);
+  txt('interaction', r.interaction_suggestions);
+
+  // 风险提示
+  const risk = p.risk_alerts || {};
+  renderList('sensitive-topics', risk.sensitive_topics, 'text-orange-700');
+  renderList('info-gaps', risk.information_gaps, 'text-orange-700');
+  txt('competitive', risk.competitive_sensitivities);
+
+  // 补充说明
+  const supplement = data.supplement || {};
+  const supplementText = typeof supplement === 'string' ? supplement : (supplement.notes || '');
+  txt('supplement-display', supplementText);
+
+  // 来源
+  const srcList = $('sources-list');
+  srcList.innerHTML = '';
+  (data.sources || []).forEach((s, i) => {
+    const li = document.createElement('li');
+    li.className = 'text-xs flex gap-2 items-start';
+    li.innerHTML = `
+      <span class="shrink-0 w-5 h-5 rounded bg-slate-100 text-slate-500 flex items-center justify-center font-mono">${i+1}</span>
+      <div>
+        <a href="${s.url}" target="_blank" class="text-blue-600 hover:underline font-medium">${s.title || s.url}</a>
+        ${s.relevance ? `<p class="text-slate-400 mt-0.5">${s.relevance}</p>` : ''}
+      </div>`;
+    srcList.appendChild(li);
+  });
+
+  // 搜索词
+  const qList = $('queries-list');
+  qList.innerHTML = '';
+  (data.queries_executed || []).forEach(q => {
+    const tag = document.createElement('span');
+    tag.className = 'px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-xs';
+    tag.textContent = q;
+    qList.appendChild(tag);
+  });
+
+  $('loading-state').classList.add('hidden');
+  $('results').classList.remove('hidden');
+  $('results').classList.add('fade-in');
+}
+
+function toggleEditMode() {
+  isEditMode = !isEditMode;
+  const p = currentData.portrait || {};
+  const risk = p.risk_alerts || {};
+  const focus = p.reception_focus || {};
+  const supplement = currentData.supplement || {};
+  const supplementText = typeof supplement === 'string' ? supplement : (supplement.notes || '');
+
+  const editablePairs = [
+    ['sensitive-topics', 'edit-sensitive-topics', listToText(risk.sensitive_topics)],
+    ['info-gaps', 'edit-info-gaps', listToText(risk.information_gaps)],
+    ['competitive', 'edit-competitive', risk.competitive_sensitivities || ''],
+    ['entry-points', 'edit-entry-points', listToText(focus.entry_points)],
+    ['showcase', 'edit-showcase', focus.showcase_priorities || ''],
+    ['interaction', 'edit-interaction', focus.interaction_suggestions || ''],
+    ['supplement-display', 'edit-supplement', supplementText],
+  ];
+
+  if (isEditMode) {
+    document.body.classList.add('edit-mode');
+    $('edit-btn').classList.add('hidden');
+    $('save-btn').classList.remove('hidden');
+    editablePairs.forEach(([viewId, editId, val]) => {
+      $(viewId).classList.add('hidden');
+      $(editId).value = val;
+      $(editId).classList.remove('hidden');
+    });
+  } else {
+    document.body.classList.remove('edit-mode');
+    $('edit-btn').classList.remove('hidden');
+    $('save-btn').classList.add('hidden');
+    editablePairs.forEach(([viewId, editId]) => {
+      $(viewId).classList.remove('hidden');
+      $(editId).classList.add('hidden');
+    });
+  }
+}
+
+async function saveEdits() {
+  if (!currentData) return;
+  const portrait_id = currentData.portrait_id;
+
+  const patch = {
+    portrait: {
+      risk_alerts: {
+        sensitive_topics: textToList($('edit-sensitive-topics').value),
+        information_gaps: textToList($('edit-info-gaps').value),
+        competitive_sensitivities: $('edit-competitive').value.trim(),
+      },
+      reception_focus: {
+        entry_points: textToList($('edit-entry-points').value),
+        showcase_priorities: $('edit-showcase').value.trim(),
+        interaction_suggestions: $('edit-interaction').value.trim(),
+      },
+    },
+    supplement: {
+      notes: $('edit-supplement').value.trim(),
+    },
+  };
+
+  $('save-status').textContent = '保存中...';
+  $('save-btn').disabled = true;
+
+  try {
+    const resp = await fetch(`/portrait/${portrait_id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || '保存失败');
+    }
+    const updated = await resp.json();
+    renderPortrait(updated);
+    toggleEditMode();
+    $('save-status').textContent = '保存成功';
+    setTimeout(() => $('save-status').textContent = '', 2000);
+  } catch (err) {
+    $('save-status').textContent = `保存失败：${err.message}`;
+  } finally {
+    $('save-btn').disabled = false;
+  }
+}
+
+async function loadPortrait() {
+  const params = new URLSearchParams(window.location.search);
+  const portrait_id = params.get('id');
+  if (!portrait_id) {
+    showError('缺少画像 ID 参数');
+    return;
+  }
+
+  try {
+    const resp = await fetch(`/portrait/${portrait_id}`);
+    if (resp.status === 404) {
+      showError('画像不存在或已过期');
+      return;
+    }
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || '加载失败');
+    }
+    const data = await resp.json();
+    renderPortrait(data);
+  } catch (err) {
+    showError(err.message || '网络错误');
+  }
+}
+
+$('edit-btn').addEventListener('click', toggleEditMode);
+$('save-btn').addEventListener('click', saveEdits);
+
+loadPortrait();
+</script>
+</body>
+</html>

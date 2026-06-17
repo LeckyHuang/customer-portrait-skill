@@ -1,0 +1,36 @@
+# 客户画像生成引擎配置模板 — 复制为 config.yaml 并填入实际值
+
+llm:
+  provider: openai_compat
+  base_url: https://dashscope.aliyuncs.com/compatible-mode/v1  # DashScope / 或其他兼容接口
+  api_key: ${LLM_API_KEY}
+  model: qwen3.6-plus
+  temperature: 0.3
+  max_tokens: 4096
+
+search:
+  results_per_query: 8                         # 每次搜索返回条数
+  providers:
+    bochaai:
+      api_key: ${BOCHAAI_API_KEY}
+      endpoint: https://api.bochaai.com/v1/web-search
+      timeout: 15
+    ansipai:
+      api_key: ${ANSIPAI_API_KEY}
+      endpoint: https://plugin.anspire.cn/api/ntsearch/search
+      timeout: 15
+
+engine:
+  max_queries_total: 15         # LLM 最多可调用搜索的总次数
+  novelty_stale_rounds: 2       # 连续多少轮无新URL时强制标记剩余维度为穷举
+  fallback_sparse_threshold: 3  # 主引擎结果少于此数时自动用备用引擎补充（不消耗额外次数）
+  dimensions:                   # 调研维度（可自定义；需同步更新 prompts/portrait.txt 中的验收标准）
+    - unit_background
+    - industry_status
+    - guest_profile
+    - visit_needs
+
+prompts:
+  planning: prompts/keyword_extraction.txt     # 阶段1：调研规划（生成初始关键词）
+  research_loop: prompts/portrait.txt           # 阶段2：搜索循环（维度台账+验收标准）
+  synthesis: prompts/portrait_synthesis.txt    # 阶段3：画像合成（最终报告格式）

@@ -1,0 +1,10 @@
+.DS_Store
+config.yaml
+.env
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.json
+!*.example.json
