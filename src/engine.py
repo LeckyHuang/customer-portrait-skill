@@ -262,6 +262,12 @@ class PortraitEngine:
             industry=customer.industry,
             guest_name=customer.guest_name,
             visit_needs=customer.visit_needs,
+            client_type=customer.client_type or "未知",
+            guest_title=customer.guest_title or "未知",
+            visit_category=customer.visit_category or "未知",
+            reception_goal=customer.reception_goal or "未填写",
+            client_intro=customer.client_intro or "未填写",
+            domain_specialty_str=customer.domain_specialty or "未指定",
         )
         try:
             response = self.llm.chat([{"role": "user", "content": prompt}])
@@ -407,6 +413,12 @@ class PortraitEngine:
             guest_name=customer.guest_name,
             visit_needs=customer.visit_needs,
             search_results=search_results_text,
+            client_type=customer.client_type or "未知",
+            guest_title=customer.guest_title or "未知",
+            visit_category=customer.visit_category or "未知",
+            reception_goal=customer.reception_goal or "未填写",
+            client_intro=customer.client_intro or "未填写",
+            domain_specialty_str=customer.domain_specialty or "未指定",
         )
 
         chat_kwargs: dict = {"enable_search": self.synthesis_enable_search}

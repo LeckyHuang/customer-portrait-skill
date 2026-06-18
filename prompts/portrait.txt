@@ -2,8 +2,13 @@
 
 ## 来访客户
 - 单位：{org_name}（{industry}）
-- 主宾：{guest_name}
+- 客户属性：{client_type}
+- 主宾：{guest_name}（{guest_title}）
 - 参观需求：{visit_needs}
+- 参观专场：{domain_specialty_str}
+- 参观类别：{visit_category}
+- 接待目标：{reception_goal}
+- 客户自述：{client_intro}
 
 ## 调研规划（规划阶段生成）
 {research_plan}

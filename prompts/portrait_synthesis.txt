@@ -5,9 +5,16 @@
 
 ## 客户基本信息
 - 单位名称：{org_name}
-- 所属行业：{industry}
-- 主宾姓名：{guest_name}
-- 参观需求：{visit_needs}
+- 所属行业：{industry}（若为空，请根据参观专场推断后填入画像，如：农业农村专场→农业科技，金融专场→金融服务，工业专场→智能制造）
+- 主宾姓名及职务：{guest_name}（如包含职务请自行拆解；独立职务字段：{guest_title}）
+- 客户属性：{client_type}
+- 参观需求（专场）：{domain_specialty_str}
+- 参观类别：{visit_category}
+- 参观目的说明：{visit_needs}
+
+## 已知背景（直接来自登记表，无需推断，可作为画像的基准锚点）
+- 接待目标：{reception_goal}
+- 客户自述：{client_intro}
 
 ## 搜索研究结果
 {search_results}

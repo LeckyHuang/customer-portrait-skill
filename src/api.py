@@ -52,9 +52,48 @@ async def startup():
 
 class PortraitRequest(BaseModel):
     org_name: str
-    industry: str
     guest_name: str
-    visit_needs: str
+    # 以下字段中控邀约系统不采集，可选；留空时由本服务自动推断
+    industry: str = Field(default="", description="所属行业（可选）。留空时从 domain_specialty 自动推断")
+    visit_needs: str = Field(default="", description="参观目的说明（可选）。留空时从 domain_specialty + reception_goal 自动推断")
+    # 来自中控邀约登记的扩展字段（均可选）
+    client_type: str = Field(default="", description="客户属性：政府/部队/企业/媒体/外宾/合作伙伴/内部/其他")
+    guest_title: str = Field(default="", description="主宾职务，如：副所长、总经理")
+    visit_category: str = Field(default="", description="参观类别：领导参观型/营销发展型/客户签约型/…")
+    reception_goal: str = Field(default="", description="本次接待营销目标和目的")
+    client_intro: str = Field(default="", description="客户基本信息（填单人手工描述）")
+    domain_specialty: str = Field(default="", description="参观需求/专场，单选，如：农业农村专场")
+    display_needs: str = Field(default="", description="布展需求，透传至 wiki 接待活动记录")
+
+
+def _derive_industry(domain_specialty: str) -> str:
+    """domain_specialty → industry 兜底映射。"""
+    mapping = {
+        "农业农村专场": "农业科技",
+        "金融专场": "金融服务",
+        "工业专场": "智能制造",
+        "互联网": "互联网科技",
+        "政务公安专场": "政务信息化",
+        "政府专场": "政务服务",
+        "数厅专场": "数字政务",
+        "卫健专场": "医疗健康",
+        "住建专场": "城市建设",
+        "交通物流专场": "交通物流",
+        "文宣专场": "文化宣传",
+        "应急专场": "应急管理",
+        "资管专场": "资产管理",
+        "商客专场": "商业客户",
+        "通用场": "通用",
+    }
+    return mapping.get(domain_specialty, domain_specialty.replace("专场", ""))
+
+
+def _derive_visit_needs(req: PortraitRequest) -> str:
+    """中控不传 visit_needs 时，基于 domain_specialty + reception_goal 合成。"""
+    parts = [p for p in [req.domain_specialty, req.reception_goal] if p]
+    if parts:
+        return "，".join(parts)
+    return "参观交流"
 
 
 class PortraitIdResponse(BaseModel):
@@ -94,11 +133,17 @@ async def generate_portrait(req: PortraitRequest, background_tasks: BackgroundTa
 
     customer = CustomerInput(
         org_name=req.org_name,
-        industry=req.industry,
         guest_name=req.guest_name,
-        visit_needs=req.visit_needs,
+        industry=req.industry or _derive_industry(req.domain_specialty),
+        visit_needs=req.visit_needs or _derive_visit_needs(req),
+        client_type=req.client_type,
+        guest_title=req.guest_title,
+        visit_category=req.visit_category,
+        reception_goal=req.reception_goal,
+        client_intro=req.client_intro,
+        domain_specialty=req.domain_specialty,
     )
-    logger.info(f"[请求] org={req.org_name!r} guest={req.guest_name!r}")
+    logger.info(f"[请求] org={req.org_name!r} guest={req.guest_name!r} client_type={req.client_type!r}")
 
     loop = asyncio.get_event_loop()
     try:
@@ -166,8 +211,13 @@ async def stream_portrait(req: PortraitRequest):
         return StreamingResponse(_err(), media_type="text/event-stream")
 
     customer = CustomerInput(
-        org_name=req.org_name, industry=req.industry,
-        guest_name=req.guest_name, visit_needs=req.visit_needs,
+        org_name=req.org_name,
+        guest_name=req.guest_name,
+        industry=req.industry or _derive_industry(req.domain_specialty),
+        visit_needs=req.visit_needs or _derive_visit_needs(req),
+        client_type=req.client_type, guest_title=req.guest_title,
+        visit_category=req.visit_category, reception_goal=req.reception_goal,
+        client_intro=req.client_intro, domain_specialty=req.domain_specialty,
     )
     loop = asyncio.get_event_loop()
     queue: asyncio.Queue = asyncio.Queue()

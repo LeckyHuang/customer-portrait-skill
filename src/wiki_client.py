@@ -44,15 +44,22 @@ async def push_portrait(portrait_id: str) -> dict:
     if not data:
         return {"pushed": False, "reason": "portrait not found"}
 
+    ci = data.get("customer_input", {})
     payload = {
         "portrait_id": portrait_id,
-        "customer_input": data.get("customer_input", {}),
+        "customer_input": ci,
         "portrait": data.get("portrait", {}),
         "confidence_assessment": data.get("confidence_assessment", {}),
         "sources": data.get("sources", []),
         "queries_executed": data.get("queries_executed", []),
         "supplement": data.get("supplement", {}),
         "updated_at": data.get("updated_at"),
+        # 直传结构化字段，ingest 侧可直接使用，不依赖 LLM 推断
+        "client_type": ci.get("client_type", ""),
+        "visit_category": ci.get("visit_category", ""),
+        "domain_specialty": ci.get("domain_specialty", ""),
+        "reception_goal": ci.get("reception_goal", ""),
+        "display_needs": ci.get("display_needs", ""),
     }
 
     headers = {"Content-Type": "application/json"}
